@@ -1,300 +1,358 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-#define BUFLEN 100
-#define DATALEN 30
-
-//--------------------------structs--------------------------------
-
-struct Node
-{
-  size_t canary1;
-  char* data;
-  Node* next;
-  Node* prev;
-  Node();
-  size_t checksum;
-  size_t canary2;
-};
-
-//---------------------------
-
-struct List
-{
-  size_t canary1;
-  Node* head;
-  Node* tail;
-  unsigned count;
-  List();
-  size_t checksum;
-  size_t canary2;
-};
+#include "list.h"
 
 //--------------------struct-constructors---------------------------
 
 Node::Node()
 {
-  canary1 = (size_t) &canary1;
-  data = NULL;
-  next = NULL;
-  prev = NULL;
-  checksum = (size_t) next ^ (size_t) prev;
-  canary2 = (size_t) &canary2;
+  canary1_ = (size_t) &canary1_;
+  data_ = NULL;
+  next_ = NULL;
+  prev_ = NULL;
+  checksum_ = (size_t) next_ ^ (size_t) prev_;
+  canary2_ = (size_t) &canary2_;
+}
+
+//--------------------------
+
+Node::Node(char* data)
+{
+  canary1_ = (size_t) &canary1_;
+  data_ = (char*) calloc(strlen(data) + 1, sizeof(char));
+  strcpy(data_, data);
+  next_ = NULL;
+  prev_ = NULL;
+  checksum_ = (size_t) next_ ^ (size_t) prev_;
+  canary2_ = (size_t) &canary2_;
 }
 
 //--------------------------
 
 List::List()
 {
-  canary1 = (size_t) &canary1;
-  head = NULL;
-  tail = NULL;
-  count = 0;
-  checksum = ((size_t) head ^ (size_t) tail) & (size_t) count;
-  canary2 = (size_t) &canary2;
+  canary1_ = (size_t) &canary1_;
+  head_ = NULL;
+  tail_ = NULL;
+  count_ = 0;
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
+  canary2_ = (size_t) &canary2_;
 }
 
-//-----------------------functions-------------------------------
+//----------------------struct-destructors-------------------------
 
-int PutInHead(List* strings, Node* element)
+Node::~Node()
 {
-  element->next = strings->head;
-  element->prev = NULL;
-  strings->head = element;
-  (strings->count)++;
+  canary1_ = 0;
 
-  element->checksum = (size_t) (element->next) ^ (size_t) (element->prev);
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  if (data_ != NULL)
+    free(data_);
+
+  next_ = NULL;
+  prev_ = NULL;
+  checksum_ = 0;
+  canary2_ = 0;
+}
+
+//-------------------------
+
+List::~List()
+{
+  canary1_ = 0;
+  head_ = NULL;
+  tail_ = NULL;
+  count_ = 0;
+  checksum_ = 0;
+  canary2_ = 0;
+}
+
+//----------------------struct-functions-----------------------------
+
+int Node::ChangeData(char* data)
+{
+  if (data_ != NULL)
+    free(data_);
+
+  data_ = (char*) calloc(strlen(data) + 1, sizeof(char));
+  strcpy(data_, data);
+
+  return 0;
+}
+
+//-----------------------------------------------
+
+char* Node::ReturnData()
+{
+  return data_;
+}
+
+//-----------------------------------------------
+
+int List::PutInHead(Node* node)
+{
+  if (ListOk() == -1 || node->NodeOk() == -1)
+    return -1;
+
+  if (count_ == 0)
+    tail_ = node;
+  else
+    head_->prev_ = node;
+
+  node->next_ = head_;
+  node->prev_ = NULL;
+  head_ = node;
+  count_++;
+
+  if (count_ > 1)
+    node->next_->checksum_ = (size_t) (node->next_->next_) ^ (size_t) (node->next_->prev_);
+
+  node->checksum_ = (size_t) (node->next_) ^ (size_t) (node->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return 0;
 }
 
 //----------------------------------------------
 
-Node* DeleteFromHead(List* strings)
+Node* List::DeleteFromHead()
 {
-  Node* deleted = strings->head;
-
-  if (strings->count == 0)
+  if (ListOk() == -1)
     return NULL;
-  else if (strings->count > 1)
-    strings->head = strings->head->next;
+
+  Node* deleted = head_;
+
+  if (count_ == 0)
+    return NULL;
+  else if (count_ > 1)
+  {
+    head_ = head_->next_;
+    head_->prev_ = NULL;
+    deleted->next_ = NULL;
+  }
   else
   {
-    strings->head = NULL;
-    strings->tail = NULL;
+    head_ = NULL;
+    tail_ = NULL;
   }
 
-  (strings->count)--;
+  count_--;
 
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  if (count_ > 0)
+    head_->checksum_ = (size_t) (head_->next_) ^ (size_t) (head_->prev_);
+
+  deleted->checksum_ = (size_t) (deleted->next_) ^ (size_t) (deleted->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return deleted;
 }
 
 //-----------------------------------------------
 
-int PutInTail(List* strings, Node* element)
+int List::PutInTail(Node* node)
 {
-  element->prev = strings->tail;
-  element->next = NULL;
-  strings->tail = element;
-  (strings->count)++;
+  if (ListOk() == -1 || node->NodeOk() == -1)
+    return -1;
 
-  element->checksum = (size_t) (element->next) ^ (size_t) (element->prev);
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  if (count_ == 0)
+    head_ = node;
+  else
+    tail_->next_ = node;
+
+  node->prev_ = tail_;
+  node->next_ = NULL;
+  tail_ = node;
+  count_++;
+
+  if (count_ > 1)
+    node->prev_->checksum_ = (size_t) (node->prev_->next_) ^ (size_t) (node->prev_->prev_);
+
+  node->checksum_ = (size_t) (node->next_) ^ (size_t) (node->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return 0;
 }
 
 //----------------------------------------------
 
-Node* DeleteFromTail(List* strings)
+Node* List::DeleteFromTail()
 {
-  Node* deleted = strings->tail;
-
-  if (strings->count == 0)
+  if (ListOk() == -1)
     return NULL;
-  else if (strings->count > 1)
-    strings->tail = strings->tail->prev;
+
+  Node* deleted = tail_;
+
+  if (count_ == 0)
+    return NULL;
+  else if (count_ > 1)
+  {
+    tail_ = tail_->prev_;
+    tail_->next_ = NULL;
+    deleted->prev_ = NULL;
+  }
   else
   {
-    strings->head = NULL;
-    strings->tail = NULL;
+    head_ = NULL;
+    tail_ = NULL;
   }
 
-  (strings->count)--;
+  count_--;
 
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  if (count_ > 0)
+    tail_->checksum_ = (size_t) (tail_->next_) ^ (size_t) (tail_->prev_);
+
+  deleted->checksum_ = (size_t) (deleted->next_) ^ (size_t) (deleted->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return deleted;
 }
 
 //-----------------------------------------------
 
-int PutBeforeCur(List* strings, Node* current, Node* element)
+int List::PutBeforeCur(Node* current, Node* node)
 {
-  if (strings->head == current)
-    strings->head = element;
+  if (ListOk() == -1 || current->NodeOk() == -1 || node->NodeOk() == -1)
+    return -1;
 
-  element->prev = current->prev;
-  element->next = current;
-  current->prev = element;
-  (strings->count)++;
+  if (head_ == current)
+    head_ = node;
+  else
+    current->prev_->next_ = node;
 
-  element->checksum = (size_t) (element->next) ^ (size_t) (element->prev);
-  current->checksum = (size_t) (current->next) ^ (size_t) (current->prev);
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  node->prev_ = current->prev_;
+  node->next_ = current;
+  current->prev_ = node;
+
+  count_++;
+
+  if (node->prev_ != NULL)
+    node->prev_->checksum_ = (size_t) (node->prev_->next_) ^ (size_t) (node->prev_->prev_);
+
+  node->checksum_ = (size_t) (node->next_) ^ (size_t) (node->prev_);
+  current->checksum_ = (size_t) (current->next_) ^ (size_t) (current->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return 0;
 }
 
 //---------------------------------------------
 
-int PutAfterCur(List* strings, Node* current, Node* element)
+int List::PutAfterCur(Node* current, Node* node)
 {
-  if (strings->tail == current)
-    strings->tail = element;
+  if (ListOk() == -1 || current->NodeOk() == -1 || node->NodeOk() == -1)
+    return -1;
 
-  element->next = current->next;
-  element->prev = current;
-  current->next = element;
-  (strings->count)++;
+  if (tail_ == current)
+    tail_ = node;
+  else
+    current->next_->prev_ = node;
 
-  element->checksum = (size_t) (element->next) ^ (size_t) (element->prev);
-  current->checksum = (size_t) (current->next) ^ (size_t) (current->prev);
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  node->next_ = current->next_;
+  node->prev_ = current;
+  current->next_ = node;
+
+  count_++;
+
+  if (node->next_ != NULL)
+    node->next_->checksum_ = (size_t) (node->next_->next_) ^ (size_t) (node->next_->prev_);
+
+  node->checksum_ = (size_t) (node->next_) ^ (size_t) (node->prev_);
+  current->checksum_ = (size_t) (current->next_) ^ (size_t) (current->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return 0;
 }
 
 //---------------------------------------------
 
-int DeleteCur(List* strings, Node* current)
+int List::DeleteCur(Node* current)
 {
-  if (current->prev != NULL && current->next != NULL)
+  if (ListOk() == -1 || current->NodeOk() == -1)
+    return -1;
+
+  if (current->prev_ != NULL && current->next_ != NULL)
     {
-      current->prev->next = current->next;
-      current->next->prev = current->prev;
+      current->prev_->next_ = current->next_;
+      current->next_->prev_ = current->prev_;
+      current->prev_->checksum_ = (size_t) (current->prev_->next_) ^ (size_t) (current->prev_->prev_);
+      current->next_->checksum_ = (size_t) (current->next_->next_) ^ (size_t) (current->next_->prev_);
     }
-  else if (current->prev != NULL)
+  else if (current->prev_ != NULL)
   {
-    strings->tail = current->prev;
-    current->prev->next = NULL;
+    tail_ = current->prev_;
+    current->prev_->next_ = NULL;
+    current->prev_->checksum_ = (size_t) (current->prev_->next_) ^ (size_t) (current->prev_->prev_);
   }
-  else if (current->next != NULL)
+  else if (current->next_ != NULL)
   {
-    strings->head = current->next;
-    current->next->prev = NULL;
+    head_ = current->next_;
+    current->next_->prev_ = NULL;
+    current->next_->checksum_ = (size_t) (current->next_->next_) ^ (size_t) (current->next_->prev_);
   }
   else
   {
-    strings->head = NULL;
-    strings->tail = NULL;
+    head_ = NULL;
+    tail_ = NULL;
   }
 
-  (strings->count)--;
+  current->prev_ = NULL;
+  current->next_ = NULL;
 
-  strings->checksum = ((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count);
+  count_--;
+
+  current->checksum_ = (size_t) (current->next_) ^ (size_t) (current->prev_);
+  checksum_ = ((size_t) head_ ^ (size_t) tail_) & (size_t) count_;
 
   return 0;
 }
 
 //-----------------------------------------------
 
-int NodeOk(Node* element)
+int Node::NodeOk()
 {
-  if (element->canary1 != (size_t) &(element->canary1) || element->canary2 != (size_t) &(element->canary2) \
-  || element->checksum != ((size_t) (element->next) ^ (size_t) (element->prev)))
+  if (canary1_ != (size_t) &canary1_ || canary2_ != (size_t) &canary2_ \
+|| checksum_ != ((size_t) next_ ^ (size_t) prev_))
     return -1;
   else
     return 0;
 }
+
 //----------------------------------------------
 
-int ListOk(List* strings)
+int List::ListOk()
 {
-  if (strings->canary1 != (size_t) &(strings->canary1) || strings->canary2 != (size_t) &(strings->canary2) \
-  || strings->checksum != (((size_t) (strings->head) ^ (size_t) (strings->tail)) & (size_t) (strings->count)))
+  if (canary1_ != (size_t) &canary1_ || canary2_ != (size_t) &canary2_ \
+|| checksum_ != (((size_t) head_ ^ (size_t) tail_) & (size_t) count_))
     return -1;
   else
     return 0;
 }
 
-//-------------------------functions---------------------------
+//----------------------------------------------
 
-Node* MakeNewNode(FILE* file)
+int List::PrintList()
 {
-  Node* element;
-  element = (Node*) calloc(1, sizeof(Node));
-  element->data = (char*) calloc(DATALEN, sizeof(char));
+  if (ListOk() == -1)
+    return -1;
 
-  if (fscanf(file, "%[A-Za-z]", element->data) != EOF)
+  if (count_ == 0)
+    return 0;
+
+  size_t i = 1;
+  Node* current = head_;
+  //Node* cur = tail_;
+  if (current->NodeOk() == -1)
+    return -1;
+
+  printf("%lu. %s\n", i, current->data_);
+
+  for (i = 2; i <= count_; i++)
+  //for (i = count_; i >= 2; i--)
   {
-    printf("I\'m alive\n");
-    return element;
-  }
-  else
-    return NULL;
-}
+    current = current->next_;
+    //cur = cur->prev_;
+    if (current->NodeOk() == -1)
+      return -1;
 
-//-----------------------------------
-
-int Hash2(Node* element)
-{
-  int len = 0;
-  for (len = 0; element->data[len] !='\0'; len++)
-    ;
-
-  return (len % BUFLEN);
-}
-
-//----------------------------------
-
-int Distribution2(List* buf2, FILE* file)
-{
-  Node* element = MakeNewNode(file);
-  while (element != NULL)
-  {
-    PutInTail(&(buf2[Hash2(element)]), element);
-    element = MakeNewNode(file);
+    printf("%lu. %s\n", i, current->data_);
   }
 
-  return 0;
-}
-
-//-----------------------------------
-
-int PrintResult(List* buf)
-{
-  Node* cur = NULL;
-
-  for (int i = 0; i < BUFLEN; i++)
-  {
-    printf("%d. ", i);
-    cur = buf[i].head;
-    while (cur != NULL)
-    {
-      printf("%s ", cur->data);
-      cur = cur->next;
-    }
-    printf("\n");
-  }
-  printf("\n");
-
-  return 0;
-}
-
-//---------------------------main-------------------------------
-
-int main()
-{
-  FILE* file = fopen("text.txt", "r");
-  List* buf2 = (List*) calloc(BUFLEN, sizeof(List));
-  printf("aaa\n");
-  Distribution2(buf2, file);
-  printf("Aaa\n");
-  PrintResult(buf2);
-  printf("AAA\n");
   return 0;
 }
